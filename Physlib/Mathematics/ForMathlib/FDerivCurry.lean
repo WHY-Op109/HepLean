@@ -222,28 +222,39 @@ lemma fderiv_curry_differentiableAt_snd_comp_fst (f : X → Y → Z) (x : X) (y 
   apply Differentiable.differentiableAt
   fun_prop
 
-/- fderiv commutes on X × Y. -/
+/-- Mixed partial derivatives of `f x y` commute at a point near which `↿f` is twice
+continuously differentiable. A local version of `fderiv_swap`. -/
+lemma fderiv_swap_of_contDiffAt [IsRCLikeNormedField 𝕜] (f : X → Y → Z) (x dx : X) (y dy : Y)
+    (hf : ContDiffAt 𝕜 2 ↿f (x, y)) :
+    fderiv 𝕜 (fun x' => fderiv 𝕜 (fun y' => f x' y') y dy) x dx
+    =
+    fderiv 𝕜 (fun y' => fderiv 𝕜 (fun x' => f x' y') x dx) y dy := by
+  have hd : ∀ᶠ p in nhds (x, y), DifferentiableAt 𝕜 ↿f p :=
+    (hf.eventually (by simp)).mono fun p hp => hp.differentiableAt (by simp)
+  have hD : HasFDerivAt (fderiv 𝕜 ↿f) (fderiv 𝕜 (fderiv 𝕜 ↿f) (x, y)) (x, y) :=
+    ((hf.fderiv_right (m := 1) (by norm_num)).differentiableAt (by simp)).hasFDerivAt
+  have h1 : (fun x' => fderiv 𝕜 (fun y' => f x' y') y dy) =ᶠ[nhds x]
+      fun x' => fderiv 𝕜 ↿f (x', y) (0, dy) := by
+    filter_upwards [(continuous_id.prodMk continuous_const).continuousAt.eventually hd]
+      with x' hx'
+    simp [fderiv_uncurry f (x', y) (0, dy) hx']
+  have h2 : (fun y' => fderiv 𝕜 (fun x' => f x' y') x dx) =ᶠ[nhds y]
+      fun y' => fderiv 𝕜 ↿f (x, y') (dx, 0) := by
+    filter_upwards [(continuous_const.prodMk continuous_id).continuousAt.eventually hd]
+      with y' hy'
+    simp [fderiv_uncurry f (x, y') (dx, 0) hy']
+  have hx : HasFDerivAt (fun x' => fderiv 𝕜 ↿f (x', y) (0, dy)) _ x :=
+    (hD.comp x (hasFDerivAt_prodMk_left x y)).clm_apply (hasFDerivAt_const _ x)
+  have hy : HasFDerivAt (fun y' => fderiv 𝕜 ↿f (x, y') (dx, 0)) _ y :=
+    (hD.comp y (hasFDerivAt_prodMk_right x y)).clm_apply (hasFDerivAt_const _ y)
+  rw [h1.fderiv_eq, h2.fderiv_eq, hx.fderiv, hy.fderiv]
+  simpa using (hf.isSymmSndFDerivAt (by simp)).eq (dx, 0) (0, dy)
+
+/-- Mixed partial derivatives of `f x y` commute when `↿f` is twice continuously
+differentiable. -/
 lemma fderiv_swap [IsRCLikeNormedField 𝕜] (f : X → Y → Z) (x dx : X) (y dy : Y)
     (hf : ContDiff 𝕜 2 ↿f) :
     fderiv 𝕜 (fun x' => fderiv 𝕜 (fun y' => f x' y') y dy) x dx
     =
-    fderiv 𝕜 (fun y' => fderiv 𝕜 (fun x' => f x' y') x dx) y dy := by
-  have hf' : IsSymmSndFDerivAt 𝕜 (↿f) (x,y) := by
-    apply ContDiffAt.isSymmSndFDerivAt (n := 2)
-    · exact ContDiff.contDiffAt hf
-    · simp
-  have h := IsSymmSndFDerivAt.eq hf' (dx,0) (0,dy)
-  rw [fderiv_wrt_prod_clm_comp, fderiv_wrt_prod_clm_comp] at h
-  simp only [add_apply, ContinuousLinearMap.coe_comp,
-    ContinuousLinearMap.coe_fst', Function.comp_apply, ContinuousLinearMap.coe_snd', map_zero,
-    add_zero, zero_add] at h
-  rw [fderiv_curry_clm_apply, fderiv_curry_clm_apply] at h
-  simp only [add_apply, ContinuousLinearMap.coe_comp,
-    ContinuousLinearMap.coe_fst', Function.comp_apply, map_zero, ContinuousLinearMap.coe_snd',
-    zero_add, add_zero] at h
-  exact h
-  /- Start of differentiability conditions. -/
-  · fun_prop
-  · fun_prop
-  · exact hf.differentiable (by simp)
-  · fun_prop
+    fderiv 𝕜 (fun y' => fderiv 𝕜 (fun x' => f x' y') x dx) y dy :=
+  fderiv_swap_of_contDiffAt f x dx y dy hf.contDiffAt
